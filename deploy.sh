@@ -20,6 +20,12 @@ sudo yum install -y -q python3 python3-pip wget curl unzip \
 
 # ── 2. Python packages ───────────────────────────────────────────────────────
 echo "[2/4] Installing Python packages..."
+# Ensure pip3 is available (Amazon Linux 2 may not ship it by default)
+if ! command -v pip3 &>/dev/null; then
+    sudo yum install -y -q python3-pip 2>/dev/null || \
+    python3 -m ensurepip --upgrade 2>/dev/null || \
+    curl -s https://bootstrap.pypa.io/get-pip.py | sudo python3
+fi
 pip3 install --quiet playwright
 
 # ── 3. Playwright + Chromium ─────────────────────────────────────────────────
