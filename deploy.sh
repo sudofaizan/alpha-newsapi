@@ -6,37 +6,40 @@
 set -e
 echo "=== AlphaFX NewsAPI deploy ==="
 
-# ── 1. System packages ───────────────────────────────────────────────────────
-echo "[1/4] Installing system dependencies..."
-sudo yum update -y -q
-sudo yum install -y -q python3 python3-pip wget curl unzip \
-    atk cups-libs gtk3 libXcomposite libXcursor libXdamage \
-    libXext libXi libXrandr libXScrnSaver libXtst pango \
-    alsa-lib libdrm libgbm libxkbcommon nss mesa-libgbm \
-    xorg-x11-fonts-100dpi xorg-x11-fonts-75dpi \
-    xorg-x11-utils xorg-x11-fonts-cyrillic xorg-x11-fonts-Type1 \
-    xorg-x11-fonts-misc \
-    2>/dev/null || true   # some packages may not exist on all AL2 variants
-
-# ── 2. Python packages ───────────────────────────────────────────────────────
-echo "[2/4] Installing Python packages..."
-# Ensure pip3 is available (Amazon Linux 2 may not ship it by default)
+# ── 1. pip3 ──────────────────────────────────────────────────────────────────
+echo "[1/4] Installing pip3..."
 if ! command -v pip3 &>/dev/null; then
-    sudo yum install -y -q python3-pip 2>/dev/null || \
-    python3 -m ensurepip --upgrade 2>/dev/null || \
     curl -s https://bootstrap.pypa.io/get-pip.py | sudo python3
 fi
+
+# ── 2. Playwright Python package ─────────────────────────────────────────────
+echo "[2/4] Installing Playwright..."
 pip3 install --quiet playwright
 
-# ── 3. Playwright + Chromium ─────────────────────────────────────────────────
-echo "[3/4] Installing Playwright Chromium browser..."
+# ── 3. Chromium + all system deps ────────────────────────────────────────────
+echo "[3/4] Installing Chromium + system dependencies..."
+
+PKGS="atk at-spi2-atk at-spi2-core cups-libs gtk3 \
+      libXcomposite libXcursor libXdamage libXext \
+      libXi libXrandr libXScrnSaver libXtst \
+      pango mesa-libgbm nss nspr alsa-lib libdrm libxkbcommon \
+      xorg-x11-fonts-Type1 xorg-x11-fonts-misc"
+
+if command -v dnf &>/dev/null; then
+    # Amazon Linux 2023
+    sudo dnf install -y $PKGS 2>/dev/null || true
+else
+    # Amazon Linux 2 — enable EPEL first for libXcomposite etc.
+    sudo amazon-linux-extras install epel -y 2>/dev/null || true
+    sudo yum install -y $PKGS 2>/dev/null || true
+fi
+
+# Install Playwright's Chromium binary
 python3 -m playwright install chromium
-python3 -m playwright install-deps chromium 2>/dev/null || true
 
 # ── 4. Smoke test ────────────────────────────────────────────────────────────
 echo "[4/4] Smoke test..."
 python3 -c "from playwright.sync_api import sync_playwright; print('playwright OK')"
-python3 -c "import json, re, sys, time, argparse; print('stdlib OK')"
 
 echo ""
 echo "=== Deploy complete ==="
